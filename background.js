@@ -23,6 +23,124 @@ chrome.runtime.onStartup.addListener(() => {
   log('Extension started');
 });
 
+// Add blinking state variables
+let blinkingTabs = new Set();
+let blinkIntervals = new Map();
+
+// Listen for tab updates to detect legal pages
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    log('Tab updated:', { tabId, url: tab.url });
+    
+    // Check if URL contains legal document indicators
+    const legalIndicators = ['terms', 'privacy', 'legal', 'policy', 'agreement'];
+    const hasLegalIndicator = legalIndicators.some(indicator => 
+      tab.url.toLowerCase().includes(indicator)
+    );
+    
+    if (hasLegalIndicator) {
+      log('Legal document detected in URL:', tab.url);
+      startBlinkingBadge(tabId);
+    } else {
+      // Stop blinking if no legal indicators found
+      stopBlinkingBadge(tabId);
+    }
+  }
+});
+
+// Function to start blinking badge
+function startBlinkingBadge(tabId) {
+  // Don't start if already blinking
+  if (blinkingTabs.has(tabId)) {
+    return;
+  }
+  
+  blinkingTabs.add(tabId);
+  log('Starting blinking badge for tab:', tabId);
+  
+  let isVisible = true;
+  
+  // Set initial badge
+  chrome.action.setBadgeText({
+    tabId: tabId,
+    text: '!'
+  });
+  chrome.action.setBadgeBackgroundColor({
+    tabId: tabId,
+    color: '#ef4444'
+  });
+  
+  // Create blinking interval
+  const interval = setInterval(() => {
+    if (isVisible) {
+      // Hide badge
+      chrome.action.setBadgeText({
+        tabId: tabId,
+        text: ''
+      });
+    } else {
+      // Show badge
+      chrome.action.setBadgeText({
+        tabId: tabId,
+        text: '!'
+      });
+      chrome.action.setBadgeBackgroundColor({
+        tabId: tabId,
+        color: '#ef4444'
+      });
+    }
+    isVisible = !isVisible;
+  }, 500); // Blink every 500ms
+  
+  blinkIntervals.set(tabId, interval);
+  
+  // Stop blinking after 10 seconds and keep badge visible
+  setTimeout(() => {
+    stopBlinkingBadge(tabId, true);
+  }, 10000);
+}
+
+// Function to stop blinking badge
+function stopBlinkingBadge(tabId, keepVisible = false) {
+  if (!blinkingTabs.has(tabId)) {
+    return;
+  }
+  
+  blinkingTabs.delete(tabId);
+  
+  // Clear interval
+  const interval = blinkIntervals.get(tabId);
+  if (interval) {
+    clearInterval(interval);
+    blinkIntervals.delete(tabId);
+  }
+  
+  log('Stopping blinking badge for tab:', tabId);
+  
+  if (keepVisible) {
+    // Keep badge visible but stop blinking
+    chrome.action.setBadgeText({
+      tabId: tabId,
+      text: '!'
+    });
+    chrome.action.setBadgeBackgroundColor({
+      tabId: tabId,
+      color: '#ef4444'
+    });
+  } else {
+    // Remove badge completely
+    chrome.action.setBadgeText({
+      tabId: tabId,
+      text: ''
+    });
+  }
+}
+
+// Clean up intervals when tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  stopBlinkingBadge(tabId);
+});
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   log('Received message:', request);
@@ -38,6 +156,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
     return true; // Keep message channel open for async response
+  }
+  
+  // Handle setBadge message from content script
+  if (request.action === 'setBadge') {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      startBlinkingBadge(tabId);
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  // Handle stopBadge message
+  if (request.action === 'stopBadge') {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      stopBlinkingBadge(tabId);
+    }
+    sendResponse({ success: true });
+    return true;
   }
   
   sendResponse({ success: false, error: 'Unknown action' });
@@ -98,30 +236,5 @@ async function analyzeDocument(content, documentType) {
     throw error;
   }
 }
-
-// Listen for tab updates to detect legal pages
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    log('Tab updated:', { tabId, url: tab.url });
-    
-    // Check if URL contains legal document indicators
-    const legalIndicators = ['terms', 'privacy', 'legal', 'policy', 'agreement'];
-    const hasLegalIndicator = legalIndicators.some(indicator => 
-      tab.url.toLowerCase().includes(indicator)
-    );
-    
-    if (hasLegalIndicator) {
-      log('Legal document detected in URL:', tab.url);
-      chrome.action.setBadgeText({
-        tabId: tabId,
-        text: '!'
-      });
-      chrome.action.setBadgeBackgroundColor({
-        tabId: tabId,
-        color: '#ef4444'
-      });
-    }
-  }
-});
 
 log('Background script loaded successfully');

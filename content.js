@@ -229,7 +229,7 @@ class LegalDocumentDetector {
   notifyLegalDocumentFound(type) {
     log('Notifying legal document found:', type);
     
-    // Set badge on extension icon
+    // Set blinking badge on extension icon
     chrome.runtime.sendMessage({
       action: 'setBadge',
       text: '!',
@@ -246,6 +246,11 @@ class LegalDocumentDetector {
 
   notifyNoLegalDocument() {
     log('Notifying no legal document found');
+    
+    // Stop blinking badge
+    chrome.runtime.sendMessage({
+      action: 'stopBadge'
+    });
     
     chrome.runtime.sendMessage({
       action: 'noDocumentFound'
