@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "SafeRead - Legal Document Analyzer",
+  "version": "1.0",
+  "description": "Automatically detect and analyze legal documents, terms & conditions, and privacy policies on web pages",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SafeRead"
+  },
+  "icons": {
+    "50": "icons/icon.png"
+  }
+}
