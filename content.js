@@ -41,6 +41,12 @@ class LegalDocumentDetector {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       log('Received message from popup:', request);
       
+      // Handle ping message
+      if (request.action === 'ping') {
+        sendResponse({ success: true });
+        return true;
+      }
+      
       if (request.action === 'getPageContent') {
         this.getPageContent()
           .then(result => {

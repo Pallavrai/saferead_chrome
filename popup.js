@@ -83,10 +83,27 @@ class SafeReadPopup {
     this.showLoading();
     
     try {
-      // Send message to content script to check for legal documents
-      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
+      // Check if we can communicate with the content script
+      if (!this.currentTab || !this.currentTab.id) {
+        throw new Error('No active tab found');
+      }
+
+      // Check if the URL is a chrome:// or extension:// page where content scripts can't run
+      if (this.currentTab.url.startsWith('chrome://') || 
+          this.currentTab.url.startsWith('chrome-extension://') ||
+          this.currentTab.url.startsWith('edge://') ||
+          this.currentTab.url.startsWith('about:')) {
+        this.showNoDocuments();
+        return;
+      }
+
+      // Try to inject content script if it's not already there
+      await this.ensureContentScriptLoaded();
+
+      // Send message to content script with timeout
+      const response = await this.sendMessageWithTimeout(this.currentTab.id, {
         action: 'getPageContent'
-      });
+      }, 5000); // 5 second timeout
 
       if (response && response.isLegalPage) {
         this.handleDocumentDetected(response);
@@ -95,7 +112,81 @@ class SafeReadPopup {
       }
     } catch (error) {
       console.error('Error checking page:', error);
-      this.showError('Failed to scan page. Please refresh and try again.');
+      
+      // Check if it's a connection error
+      if (error.message.includes('Could not establish connection') || 
+          error.message.includes('Receiving end does not exist')) {
+        // Try to inject content script and retry
+        try {
+          await this.injectContentScript();
+          // Wait a bit for the script to initialize
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Retry the check
+          await this.retryCheckPageForLegalDocuments();
+        } catch (retryError) {
+          console.error('Retry failed:', retryError);
+          this.showError('Unable to scan this page. Please refresh and try again.');
+        }
+      } else {
+        this.showError('Failed to scan page. Please refresh and try again.');
+      }
+    }
+  }
+
+  async ensureContentScriptLoaded() {
+    try {
+      // Try to ping the content script
+      await chrome.tabs.sendMessage(this.currentTab.id, { action: 'ping' });
+    } catch (error) {
+      // If ping fails, inject the content script
+      await this.injectContentScript();
+    }
+  }
+
+  async injectContentScript() {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: this.currentTab.id },
+        files: ['content.js']
+      });
+      console.log('Content script injected successfully');
+    } catch (error) {
+      console.error('Failed to inject content script:', error);
+      throw new Error('Cannot inject content script on this page');
+    }
+  }
+
+  async sendMessageWithTimeout(tabId, message, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Message timeout'));
+      }, timeout);
+
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        clearTimeout(timeoutId);
+        
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  async retryCheckPageForLegalDocuments() {
+    try {
+      const response = await this.sendMessageWithTimeout(this.currentTab.id, {
+        action: 'getPageContent'
+      }, 3000);
+
+      if (response && response.isLegalPage) {
+        this.handleDocumentDetected(response);
+      } else {
+        this.showNoDocuments();
+      }
+    } catch (error) {
+      throw new Error('Retry failed: ' + error.message);
     }
   }
 
