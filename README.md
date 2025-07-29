@@ -12,16 +12,6 @@ A Chrome extension that automatically detects and analyzes legal documents, term
 - 🌙 **Dark/Light Theme**: Modern UI with theme switching
 - 🔔 **Visual Indicators**: Badge notifications for detected documents
 
-## Screenshots
-
-### Extension Popup Interface
-![SafeRead Extension Popup](screenshots/1.png)
-
-### Analysis Results View
-![Analysis Results](screenshots/2.png)
-
-### Theme Switching
-![Dark/Light Theme](screenshots/3.png)
 
 ## Installation
 
@@ -81,14 +71,16 @@ This extension requires a local API server running on `http://localhost:8000`. T
 
 ![Extension Interface](screenshots/1.png)
 
-3. **View Results**: If a legal document is detected, click "Analyze" to get AI-powered insights.
+3. **Page Detected**: If a legal page is detected, click "Analyze" to get AI-powered insights.
 
-![Analysis Results](screenshots/2.png)
+![Detected](screenshots/2.png)
 
 4. **Review Points**: The extension will show:
    - **Summary**: A concise overview of the document
    - **Risk Points**: Potentially problematic clauses highlighted in red
    - **Favorable Points**: User-friendly terms highlighted in green
+
+![result](screenshots/3.png)
 
 ## Document Detection
 
@@ -114,7 +106,7 @@ The extension detects legal documents by:
 - **Error Handling**: Graceful error messages and retry options
 - **Visual Indicators**: Color-coded risk and favorable points
 
-![Theme Options](screenshots/3.png)
+
 
 ## File Structure
 
@@ -127,9 +119,6 @@ saferead_chrome/
 ├── background.js          # Background service worker
 ├── icons/                 # Extension icons
 │   ├── icon.svg
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
 └── README.md              # This file
 ```
 
